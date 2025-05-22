@@ -1,45 +1,45 @@
-# Aptos トークンエアドロップ抽選スマートコントラクト
+# Aptos Token Airdrop Lottery Smart Contract
 
-## 概要
+## Overview
 
-このスマートコントラクトは、Aptosブロックチェーン上でトークンエアドロップの当選者を公平かつ透明に選出するための抽選システムを提供します。Aptosのオンチェーンランダムネスを活用し、高いセキュリティと信頼性を実現しています。
+This smart contract provides a fair and transparent lottery system for selecting winners of token airdrops on the Aptos blockchain. It leverages Aptos on-chain randomness to ensure high security and reliability.
 
-## 主な機能
+## Main Features
 
-1. **抽選の作成と管理**
-   - 名前、説明、当選者数、締切時間の設定
-   - 抽選の削除や締切時間の更新
-2. **参加者の登録と管理**
-   - ユーザー自身による参加登録
-   - 管理者による参加者の追加・削除
-3. **抽選の実行**
-   - Aptosのオンチェーンランダムネスを利用した公平な当選者選出
-   - 締切時間後のみ実行可能
-4. **結果の照会**
-   - 抽選の詳細情報の取得
-   - 参加者リストの取得
-   - 当選者リストの取得
+1. **Lottery Creation and Management**
+   - Set name, description, number of winners, and deadline
+   - Delete lotteries or update deadlines
+2. **Participant Registration and Management**
+   - Users can register themselves
+   - Admins can add or remove participants
+3. **Lottery Execution**
+   - Fair winner selection using Aptos on-chain randomness
+   - Can only be executed after the deadline
+4. **Result Inquiry**
+   - Retrieve lottery details
+   - Get participant list
+   - Get winner list
 
-## 使用方法
+## Usage
 
-### 1. コントラクトのデプロイ
+### 1. Deploy the Contract
 
 ```bash
-# Aptos CLIのインストール
+# Install Aptos CLI
 curl -fsSL "https://aptos.dev/scripts/install_cli.py" | python3
 
-# プロジェクトの初期化
+# Initialize the project
 cd airdrop_lottery
 aptos init
 
-# コントラクトのコンパイル
+# Compile the contract
 aptos move compile
 
-# コントラクトのデプロイ
+# Deploy the contract
 aptos move publish
 ```
 
-### 2. 抽選の作成
+### 2. Create a Lottery
 
 ```bash
 aptos move run \
@@ -47,66 +47,66 @@ aptos move run \
   --args string:"NFT Airdrop" string:"Win exclusive NFTs!" u64:10 u64:1717027200
 ```
 
-- 抽選名
-- 説明
-- 当選者数
-- 締切時間（UNIXタイムスタンプ）
+- Lottery name
+- Description
+- Number of winners
+- Deadline (UNIX timestamp)
 
-### 3. 抽選への参加
+### 3. Register for a Lottery
 
 ```bash
 aptos move run \
   --function-id <your_address>::airdrop_lottery::register_participant \
   --args u64:0
 ```
-- 抽選ID
+- Lottery ID
 
-### 4. 抽選の実行（締切後）
+### 4. Draw Winners (After Deadline)
 
 ```bash
 aptos move run \
   --function-id <your_address>::airdrop_lottery::draw_winners \
   --args u64:0
 ```
-- 抽選ID
+- Lottery ID
 
-### 5. 結果の確認
+### 5. Check Results
 
 ```bash
-# 抽選の詳細を確認
+# Check lottery details
 aptos move view \
   --function-id <your_address>::airdrop_lottery::get_lottery_details \
   --args u64:0
 
-# 当選者リストを確認
+# Check winner list
 aptos move view \
   --function-id <your_address>::airdrop_lottery::get_winners \
   --args u64:0
 ```
 
-## セキュリティ検証
+## Security Verification
 
-- Aptosの`#[randomness]`属性を活用し、予測不可能なランダムネスを実現
-- Undergasing攻撃対策として大規模参加者リストへの処理分割とガス制限を実装
-- 抽選作成者のみが管理機能を実行可能
-- 締切時間前の抽選実行や締切後の参加を防止
-- 参加者の重複登録防止、当選者の重複なし
-- 適切なイベント発行とデータ整合性の確保
-- コードの可読性・保守性・エラーハンドリング・ドキュメント充実
-- 主要な脆弱性は検出されず、設計通りに安全に動作することを確認
+- Utilizes Aptos `#[randomness]` attribute for unpredictable randomness
+- Implements undergasing attack prevention with batch processing and gas limits
+- Only the lottery creator can execute admin functions
+- Prevents drawing before the deadline and joining after the deadline
+- Prevents duplicate participant registration and duplicate winners
+- Ensures proper event emission and data integrity
+- Code is readable, maintainable, and well-documented with robust error handling
+- No major vulnerabilities found; works as designed
 
-## エラーコード
+## Error Codes
 
-- `E_NOT_AUTHORIZED (1)`: 権限がありません
-- `E_LOTTERY_NOT_FOUND (2)`: 抽選が見つかりません
-- `E_LOTTERY_ALREADY_COMPLETED (3)`: 抽選は既に完了しています
-- `E_LOTTERY_NOT_COMPLETED (4)`: 抽選はまだ完了していません
-- `E_DEADLINE_NOT_REACHED (5)`: 締切時間に達していません
-- `E_DEADLINE_PASSED (6)`: 締切時間を過ぎています
-- `E_ALREADY_REGISTERED (7)`: 既に登録されています
-- `E_INVALID_WINNER_COUNT (8)`: 無効な当選者数です
-- `E_INSUFFICIENT_PARTICIPANTS (9)`: 参加者が不足しています
+- `E_NOT_AUTHORIZED (1)`: Not authorized
+- `E_LOTTERY_NOT_FOUND (2)`: Lottery not found
+- `E_LOTTERY_ALREADY_COMPLETED (3)`: Lottery already completed
+- `E_LOTTERY_NOT_COMPLETED (4)`: Lottery not yet completed
+- `E_DEADLINE_NOT_REACHED (5)`: Deadline not reached
+- `E_DEADLINE_PASSED (6)`: Deadline has passed
+- `E_ALREADY_REGISTERED (7)`: Already registered
+- `E_INVALID_WINNER_COUNT (8)`: Invalid winner count
+- `E_INSUFFICIENT_PARTICIPANTS (9)`: Not enough participants
 
-## ライセンス
+## License
 
-このスマートコントラクトはMITライセンスの下で提供されています。 
+This smart contract is provided under the MIT License. 

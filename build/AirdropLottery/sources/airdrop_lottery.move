@@ -1,4 +1,5 @@
 module airdrop_lottery_addr::airdrop_lottery {
+    friend airdrop_lottery_addr::airdrop_lottery_tests;
     use std::error;
     use std::signer;
     use std::string::{Self, String};
@@ -92,6 +93,10 @@ module airdrop_lottery_addr::airdrop_lottery {
         move_to(account, AccountLotteries {
             created_lotteries: vector::empty<u64>(),
         });
+    }
+
+    public(friend) fun init_module_for_test(account: &signer) {
+        init_module(account);
     }
 
     /// Create a new lottery

@@ -1,0 +1,10 @@
+[package]
+name = "AirdropLottery"
+version = "1.0.0"
+authors = ["Manus"]
+
+[addresses]
+airdrop_lottery_addr = "0x8ed2297bf8fe188bd95d6bea0006f130a69f9aac9c90e7cdcfd0e941c8171db6"
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "main" }

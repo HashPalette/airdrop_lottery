@@ -52,14 +52,15 @@ aptos move run \
 - 当選者数
 - 締切時間（UNIXタイムスタンプ）
 
-### 3. 抽選への参加
+### 3. 抽選への参加者追加
 
 ```bash
 aptos move run \
-  --function-id <your_address>::airdrop_lottery::register_participant \
-  --args u64:0
+  --function-id <your_address>::airdrop_lottery::add_participant \
+  --args u64:0 'address:["0x1", "0x2", "0x3"]'
 ```
 - 抽選ID
+- 参加者アドレス
 
 ### 4. 抽選の実行（締切後）
 
@@ -109,4 +110,4 @@ aptos move view \
 
 ## ライセンス
 
-このスマートコントラクトはMITライセンスの下で提供されています。 
+このスマートコントラクトはMITライセンスの下で提供されています。  

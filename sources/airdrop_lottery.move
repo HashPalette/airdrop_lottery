@@ -485,4 +485,34 @@ module airdrop_lottery_addr::airdrop_lottery {
         timestamp::update_global_time_for_test_secs(current_time + 3601);
         draw_winners(user2, LOTTERY_ID);
     }
+
+    #[test(aptos_framework = @aptos_framework, admin = @airdrop_lottery_addr, user1 = @0x1234, user2 = @0x5678, user3 = @0x9ABC)]
+    public fun test_add_multiple_participants(aptos_framework: &signer, admin: &signer, user1: &signer, user2: &signer, user3: &signer) acquires AccountLotteries, ModuleData, AirdropLottery {
+        setup_test(aptos_framework, admin);
+        account::create_account_for_test(signer::address_of(user1));
+        account::create_account_for_test(signer::address_of(user2));
+        account::create_account_for_test(signer::address_of(user3));
+        let name = string::utf8(b"Test Lottery");
+        let description = string::utf8(b"This is a test lottery");
+        let winner_count = 2;
+        let current_time = timestamp::now_seconds();
+        let deadline = current_time + 3600;
+        create_lottery(admin, name, description, winner_count, deadline);
+        
+        // Create a vector with multiple addresses
+        let participants = vector::empty<address>();
+        vector::push_back(&mut participants, signer::address_of(user1));
+        vector::push_back(&mut participants, signer::address_of(user2));
+        vector::push_back(&mut participants, signer::address_of(user3));
+        
+        // Add multiple participants in a single call
+        add_participant(admin, LOTTERY_ID, participants);
+        
+        // Verify all participants were added
+        let registered_participants = get_participants(LOTTERY_ID);
+        assert!(vector::length(&registered_participants) == 3, 0);
+        assert!(*vector::borrow(&registered_participants, 0) == signer::address_of(user1), 1);
+        assert!(*vector::borrow(&registered_participants, 1) == signer::address_of(user2), 2);
+        assert!(*vector::borrow(&registered_participants, 2) == signer::address_of(user3), 3);
+    }
 }

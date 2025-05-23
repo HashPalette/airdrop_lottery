@@ -156,37 +156,11 @@ module airdrop_lottery_addr::airdrop_lottery {
         );
     }
 
-    /// Register for the lottery
-    public entry fun register_participant(
-        account: &signer,
-        lottery_id: u64
-    ) acquires AirdropLottery {
-        let participant_addr = signer::address_of(account);
-        
-        // Check if the lottery exists
-        assert!(exists<AirdropLottery>(@airdrop_lottery_addr), error::not_found(E_LOTTERY_NOT_FOUND));
-        
-        let lottery = borrow_global_mut<AirdropLottery>(@airdrop_lottery_addr);
-        
-        // Check if the lottery is not completed
-        assert!(!lottery.is_completed, error::invalid_state(E_LOTTERY_ALREADY_COMPLETED));
-        
-        // Check if the deadline has not passed
-        assert!(timestamp::now_seconds() <= lottery.deadline, error::invalid_state(E_DEADLINE_PASSED));
-        
-        // Check if not already registered
-        let (is_registered, _) = vector::index_of(&lottery.participants, &participant_addr);
-        assert!(!is_registered, error::already_exists(E_ALREADY_REGISTERED));
-        
-        // Add participant
-        vector::push_back(&mut lottery.participants, participant_addr);
-    }
-
-    /// Add a participant (creator only)
+    /// Add participant(s) (creator only)
     public entry fun add_participant(
         account: &signer,
         lottery_id: u64,
-        participant: address
+        participants: vector<address>
     ) acquires AirdropLottery {
         let account_addr = signer::address_of(account);
         
@@ -201,19 +175,25 @@ module airdrop_lottery_addr::airdrop_lottery {
         // Check if the lottery is not completed
         assert!(!lottery.is_completed, error::invalid_state(E_LOTTERY_ALREADY_COMPLETED));
         
-        // Check if not already registered
-        let (is_registered, _) = vector::index_of(&lottery.participants, &participant);
-        assert!(!is_registered, error::already_exists(E_ALREADY_REGISTERED));
-        
-        // Add participant
-        vector::push_back(&mut lottery.participants, participant);
+        // Add participants
+        let i = 0;
+        let participants_count = vector::length(&participants);
+        while (i < participants_count) {
+            let participant = *vector::borrow(&participants, i);
+            // Check if not already registered
+            let (is_registered, _) = vector::index_of(&lottery.participants, &participant);
+            if (!is_registered) {
+                vector::push_back(&mut lottery.participants, participant);
+            };
+            i = i + 1;
+        };
     }
 
-    /// Remove a participant (creator only)
+    /// Remove participant(s) (creator only)
     public entry fun remove_participant(
         account: &signer,
         lottery_id: u64,
-        participant: address
+        participants: vector<address>
     ) acquires AirdropLottery {
         let account_addr = signer::address_of(account);
         
@@ -228,12 +208,18 @@ module airdrop_lottery_addr::airdrop_lottery {
         // Check if the lottery is not completed
         assert!(!lottery.is_completed, error::invalid_state(E_LOTTERY_ALREADY_COMPLETED));
         
-        // Check if the participant exists
-        let (is_registered, index) = vector::index_of(&lottery.participants, &participant);
-        assert!(is_registered, error::not_found(E_LOTTERY_NOT_FOUND));
-        
-        // Remove participant
-        vector::remove(&mut lottery.participants, index);
+        // Remove participants
+        let i = 0;
+        let participants_count = vector::length(&participants);
+        while (i < participants_count) {
+            let participant = *vector::borrow(&participants, i);
+            // Check if the participant exists
+            let (is_registered, index) = vector::index_of(&lottery.participants, &participant);
+            if (is_registered) {
+                vector::remove(&mut lottery.participants, index);
+            };
+            i = i + 1;
+        };
     }
 
     /// Execute the lottery and select winners (creator only)
@@ -405,8 +391,8 @@ module airdrop_lottery_addr::airdrop_lottery {
         let current_time = timestamp::now_seconds();
         let deadline = current_time + 3600;
         create_lottery(admin, name, description, winner_count, deadline);
-        register_participant(user1, LOTTERY_ID);
-        register_participant(user2, LOTTERY_ID);
+        add_participant(admin, LOTTERY_ID, vector::singleton(signer::address_of(user1)));
+        add_participant(admin, LOTTERY_ID, vector::singleton(signer::address_of(user2)));
         let participants = get_participants(LOTTERY_ID);
         assert!(vector::length(&participants) == 2, 0);
         assert!(*vector::borrow(&participants, 0) == signer::address_of(user1), 1);
@@ -427,9 +413,9 @@ module airdrop_lottery_addr::airdrop_lottery {
         let current_time = timestamp::now_seconds();
         let deadline = current_time + 3600;
         create_lottery(admin, name, description, winner_count, deadline);
-        register_participant(user1, LOTTERY_ID);
-        register_participant(user2, LOTTERY_ID);
-        register_participant(user3, LOTTERY_ID);
+        add_participant(admin, LOTTERY_ID, vector::singleton(signer::address_of(user1)));
+        add_participant(admin, LOTTERY_ID, vector::singleton(signer::address_of(user2)));
+        add_participant(admin, LOTTERY_ID, vector::singleton(signer::address_of(user3)));
         timestamp::update_global_time_for_test_secs(current_time + 3601);
         draw_winners(admin, LOTTERY_ID);
         let (_, _, _, _, is_completed, _, _, _) = get_lottery_details(LOTTERY_ID);
@@ -459,7 +445,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         let current_time = timestamp::now_seconds();
         let deadline = current_time + 3600;
         create_lottery(admin, name, description, winner_count, deadline);
-        register_participant(user1, LOTTERY_ID);
+        add_participant(admin, LOTTERY_ID, vector::singleton(signer::address_of(user1)));
         draw_winners(admin, LOTTERY_ID);
     }
 
@@ -476,7 +462,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         let current_time = timestamp::now_seconds();
         let deadline = current_time + 3600;
         create_lottery(admin, name, description, winner_count, deadline);
-        register_participant(user1, LOTTERY_ID);
+        add_participant(admin, LOTTERY_ID, vector::singleton(signer::address_of(user1)));
         timestamp::update_global_time_for_test_secs(current_time + 3601);
         draw_winners(admin, LOTTERY_ID);
     }
@@ -495,8 +481,74 @@ module airdrop_lottery_addr::airdrop_lottery {
         let current_time = timestamp::now_seconds();
         let deadline = current_time + 3600;
         create_lottery(admin, name, description, winner_count, deadline);
-        register_participant(user1, LOTTERY_ID);
+        add_participant(admin, LOTTERY_ID, vector::singleton(signer::address_of(user1)));
         timestamp::update_global_time_for_test_secs(current_time + 3601);
         draw_winners(user2, LOTTERY_ID);
+    }
+
+    #[test(aptos_framework = @aptos_framework, admin = @airdrop_lottery_addr, user1 = @0x1234, user2 = @0x5678, user3 = @0x9ABC)]
+    public fun test_add_multiple_participants(aptos_framework: &signer, admin: &signer, user1: &signer, user2: &signer, user3: &signer) acquires AccountLotteries, ModuleData, AirdropLottery {
+        setup_test(aptos_framework, admin);
+        account::create_account_for_test(signer::address_of(user1));
+        account::create_account_for_test(signer::address_of(user2));
+        account::create_account_for_test(signer::address_of(user3));
+        let name = string::utf8(b"Test Lottery");
+        let description = string::utf8(b"This is a test lottery");
+        let winner_count = 2;
+        let current_time = timestamp::now_seconds();
+        let deadline = current_time + 3600;
+        create_lottery(admin, name, description, winner_count, deadline);
+        
+        // Create a vector with multiple addresses
+        let participants = vector::empty<address>();
+        vector::push_back(&mut participants, signer::address_of(user1));
+        vector::push_back(&mut participants, signer::address_of(user2));
+        vector::push_back(&mut participants, signer::address_of(user3));
+        
+        // Add multiple participants in a single call
+        add_participant(admin, LOTTERY_ID, participants);
+        
+        // Verify all participants were added
+        let registered_participants = get_participants(LOTTERY_ID);
+        assert!(vector::length(&registered_participants) == 3, 0);
+        assert!(*vector::borrow(&registered_participants, 0) == signer::address_of(user1), 1);
+        assert!(*vector::borrow(&registered_participants, 1) == signer::address_of(user2), 2);
+        assert!(*vector::borrow(&registered_participants, 2) == signer::address_of(user3), 3);
+    }
+
+    #[test(aptos_framework = @aptos_framework, admin = @airdrop_lottery_addr, user1 = @0x1234, user2 = @0x5678, user3 = @0x9ABC)]
+    public fun test_remove_multiple_participants(aptos_framework: &signer, admin: &signer, user1: &signer, user2: &signer, user3: &signer) acquires AccountLotteries, ModuleData, AirdropLottery {
+        setup_test(aptos_framework, admin);
+        account::create_account_for_test(signer::address_of(user1));
+        account::create_account_for_test(signer::address_of(user2));
+        account::create_account_for_test(signer::address_of(user3));
+        let name = string::utf8(b"Test Lottery");
+        let description = string::utf8(b"This is a test lottery");
+        let winner_count = 2;
+        let current_time = timestamp::now_seconds();
+        let deadline = current_time + 3600;
+        create_lottery(admin, name, description, winner_count, deadline);
+        
+        // First add all participants individually
+        add_participant(admin, LOTTERY_ID, vector::singleton(signer::address_of(user1)));
+        add_participant(admin, LOTTERY_ID, vector::singleton(signer::address_of(user2)));
+        add_participant(admin, LOTTERY_ID, vector::singleton(signer::address_of(user3)));
+        
+        // Verify all participants were added
+        let registered_participants = get_participants(LOTTERY_ID);
+        assert!(vector::length(&registered_participants) == 3, 0);
+        
+        // Create a vector with multiple addresses to remove
+        let participants_to_remove = vector::empty<address>();
+        vector::push_back(&mut participants_to_remove, signer::address_of(user1));
+        vector::push_back(&mut participants_to_remove, signer::address_of(user3));
+        
+        // Remove multiple participants in a single call
+        remove_participant(admin, LOTTERY_ID, participants_to_remove);
+        
+        // Verify only user2 remains in the participants list
+        let remaining_participants = get_participants(LOTTERY_ID);
+        assert!(vector::length(&remaining_participants) == 1, 1);
+        assert!(*vector::borrow(&remaining_participants, 0) == signer::address_of(user2), 2);
     }
 }

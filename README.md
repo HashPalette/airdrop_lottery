@@ -52,14 +52,15 @@ aptos move run \
 - Number of winners
 - Deadline (UNIX timestamp)
 
-### 3. Register for a Lottery
+### 3. Add Participants to a Lottery
 
 ```bash
 aptos move run \
-  --function-id <your_address>::airdrop_lottery::register_participant \
-  --args u64:0
+  --function-id <your_address>::airdrop_lottery::add_participant \
+  --args u64:0 'address:["0x1", "0x2", "0x3"]'
 ```
 - Lottery ID
+- Participant addresses
 
 ### 4. Draw Winners (After Deadline)
 
@@ -109,4 +110,4 @@ aptos move view \
 
 ## License
 
-This smart contract is provided under the MIT License. 
+This smart contract is provided under the MIT License.  

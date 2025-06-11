@@ -561,4 +561,20 @@ module airdrop_lottery_addr::airdrop_lottery {
         assert!(vector::length(&remaining_participants) == 1, 1);
         assert!(*vector::borrow(&remaining_participants, 0) == signer::address_of(user2), 2);
     }
+
+    #[test(aptos_framework = @aptos_framework, admin = @airdrop_lottery_addr, user1 = @0x1234)]
+    #[expected_failure(abort_code = 196612, location = airdrop_lottery_addr::airdrop_lottery)]
+    public fun test_get_winners_before_draw(aptos_framework: &signer, admin: &signer, user1: &signer) acquires AccountLotteries, ModuleData {
+        setup_test(aptos_framework, admin);
+        account::create_account_for_test(signer::address_of(user1));
+        let name = string::utf8(b"Test Lottery");
+        let description = string::utf8(b"This is a test lottery");
+        let winner_count = 1;
+        let current_time = timestamp::now_seconds();
+        let deadline = current_time + 3600;
+        create_lottery(admin, name, description, winner_count, deadline);
+        add_participant(admin, LOTTERY_ID, vector::singleton(signer::address_of(user1)));
+        // Try to get winners before drawing - should fail with E_LOTTERY_NOT_COMPLETED
+        get_winners(LOTTERY_ID);
+    }
 }

@@ -326,9 +326,11 @@ module airdrop_lottery_addr::airdrop_lottery {
         assert!(table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
         
         let lottery = table::borrow(&module_data.lotteries_table, lottery_id);
-        assert!(lottery.is_completed, error::invalid_state(E_LOTTERY_NOT_COMPLETED));
-        
-        *&lottery.winners
+        if (lottery.is_completed) {
+            *&lottery.winners
+        } else {
+            vector::empty<address>()
+        }
     }
 
     /// Get the list of lotteries created by the account
@@ -563,7 +565,6 @@ module airdrop_lottery_addr::airdrop_lottery {
     }
 
     #[test(aptos_framework = @aptos_framework, admin = @airdrop_lottery_addr, user1 = @0x1234)]
-    #[expected_failure(abort_code = 196612, location = airdrop_lottery_addr::airdrop_lottery)]
     public fun test_get_winners_before_draw(aptos_framework: &signer, admin: &signer, user1: &signer) acquires AccountLotteries, ModuleData {
         setup_test(aptos_framework, admin);
         account::create_account_for_test(signer::address_of(user1));
@@ -574,7 +575,8 @@ module airdrop_lottery_addr::airdrop_lottery {
         let deadline = current_time + 3600;
         create_lottery(admin, name, description, winner_count, deadline);
         add_participant(admin, LOTTERY_ID, vector::singleton(signer::address_of(user1)));
-        // Try to get winners before drawing - should fail with E_LOTTERY_NOT_COMPLETED
-        get_winners(LOTTERY_ID);
+        // Get winners before drawing - should return empty vector
+        let winners = get_winners(LOTTERY_ID);
+        assert!(vector::length(&winners) == 0, 1);
     }
 }

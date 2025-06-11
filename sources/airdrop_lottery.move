@@ -231,7 +231,7 @@ module airdrop_lottery_addr::airdrop_lottery {
     /// Execute the lottery and select winners (creator only)
     #[randomness]
     #[lint::allow_unsafe_randomness]
-    public entry fun draw_winners(
+    entry fun draw_winners(
         account: &signer,
         lottery_id: u64
     ) acquires ModuleData {

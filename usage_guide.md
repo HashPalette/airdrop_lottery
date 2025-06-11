@@ -61,7 +61,7 @@ aptos move run \
 ```bash
 aptos move run \
   --function-id <your_address>::airdrop_lottery::add_participant \
-  --args u64:0 'address:["0x1", "0x2", "0x3"]'
+  --args u64:1 'address:["0x1", "0x2", "0x3"]'
 ```
 
 パラメータ:
@@ -73,7 +73,7 @@ aptos move run \
 ```bash
 aptos move run \
   --function-id <your_address>::airdrop_lottery::draw_winners \
-  --args u64:0
+  --args u64:1
 ```
 
 パラメータ:
@@ -85,12 +85,12 @@ aptos move run \
 # 抽選の詳細を確認
 aptos move view \
   --function-id <your_address>::airdrop_lottery::get_lottery_details \
-  --args u64:0
+  --args u64:1
 
 # 当選者リストを確認
 aptos move view \
   --function-id <your_address>::airdrop_lottery::get_winners \
-  --args u64:0
+  --args u64:1
 ```
 
 ## セキュリティ考慮事項

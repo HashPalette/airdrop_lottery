@@ -82,7 +82,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         
         // Initialize ModuleData
         move_to(account, ModuleData {
-            next_lottery_id: 0,
+            next_lottery_id: 1,
             lotteries: vector::empty<u64>(),
             lottery_creation_events: account::new_event_handle<LotteryCreationEvent>(account),
             lottery_completion_events: account::new_event_handle<LotteryCompletionEvent>(account),
@@ -351,7 +351,7 @@ module airdrop_lottery_addr::airdrop_lottery {
     #[test_only]
     const USER3: address = @0x9ABC;
     #[test_only]
-    const LOTTERY_ID: u64 = 0;
+    const LOTTERY_ID: u64 = 1;
 
     #[test_only]
     fun setup_test(aptos_framework: &signer, admin: &signer) {

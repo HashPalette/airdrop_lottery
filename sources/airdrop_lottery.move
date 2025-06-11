@@ -7,6 +7,7 @@ module airdrop_lottery_addr::airdrop_lottery {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::randomness;
     use aptos_framework::timestamp;
+    use aptos_std::table::{Self, Table};
 
     /// Error codes
     const E_NOT_AUTHORIZED: u64 = 1;
@@ -49,6 +50,8 @@ module airdrop_lottery_addr::airdrop_lottery {
         next_lottery_id: u64,
         /// List of created lotteries
         lotteries: vector<u64>,
+        /// Table to store all lotteries by ID
+        lotteries_table: Table<u64, AirdropLottery>,
         /// Lottery creation event
         lottery_creation_events: EventHandle<LotteryCreationEvent>,
         /// Lottery completion event
@@ -84,6 +87,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         move_to(account, ModuleData {
             next_lottery_id: 1,
             lotteries: vector::empty<u64>(),
+            lotteries_table: table::new(),
             lottery_creation_events: account::new_event_handle<LotteryCreationEvent>(account),
             lottery_completion_events: account::new_event_handle<LotteryCompletionEvent>(account),
         });
@@ -128,7 +132,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         };
         
         // Save the lottery to global storage
-        move_to(account, lottery);
+        table::add(&mut module_data.lotteries_table, lottery_id, lottery);
         
         // Update module data
         vector::push_back(&mut module_data.lotteries, lottery_id);
@@ -161,13 +165,14 @@ module airdrop_lottery_addr::airdrop_lottery {
         account: &signer,
         lottery_id: u64,
         participants: vector<address>
-    ) acquires AirdropLottery {
+    ) acquires ModuleData {
         let account_addr = signer::address_of(account);
         
-        // Check if the lottery exists
-        assert!(exists<AirdropLottery>(@airdrop_lottery_addr), error::not_found(E_LOTTERY_NOT_FOUND));
+        // Get module data and check if lottery exists
+        let module_data = borrow_global_mut<ModuleData>(@airdrop_lottery_addr);
+        assert!(table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
         
-        let lottery = borrow_global_mut<AirdropLottery>(@airdrop_lottery_addr);
+        let lottery = table::borrow_mut(&mut module_data.lotteries_table, lottery_id);
         
         // Only the creator can execute
         assert!(account_addr == lottery.creator, error::permission_denied(E_NOT_AUTHORIZED));
@@ -194,13 +199,14 @@ module airdrop_lottery_addr::airdrop_lottery {
         account: &signer,
         lottery_id: u64,
         participants: vector<address>
-    ) acquires AirdropLottery {
+    ) acquires ModuleData {
         let account_addr = signer::address_of(account);
         
-        // Check if the lottery exists
-        assert!(exists<AirdropLottery>(@airdrop_lottery_addr), error::not_found(E_LOTTERY_NOT_FOUND));
+        // Get module data and check if lottery exists
+        let module_data = borrow_global_mut<ModuleData>(@airdrop_lottery_addr);
+        assert!(table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
         
-        let lottery = borrow_global_mut<AirdropLottery>(@airdrop_lottery_addr);
+        let lottery = table::borrow_mut(&mut module_data.lotteries_table, lottery_id);
         
         // Only the creator can execute
         assert!(account_addr == lottery.creator, error::permission_denied(E_NOT_AUTHORIZED));
@@ -227,13 +233,14 @@ module airdrop_lottery_addr::airdrop_lottery {
     public entry fun draw_winners(
         account: &signer,
         lottery_id: u64
-    ) acquires AirdropLottery, ModuleData {
+    ) acquires ModuleData {
         let account_addr = signer::address_of(account);
         
-        // Check if the lottery exists
-        assert!(exists<AirdropLottery>(@airdrop_lottery_addr), error::not_found(E_LOTTERY_NOT_FOUND));
+        // Get module data and check if lottery exists
+        let module_data = borrow_global_mut<ModuleData>(@airdrop_lottery_addr);
+        assert!(table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
         
-        let lottery = borrow_global_mut<AirdropLottery>(@airdrop_lottery_addr);
+        let lottery = table::borrow_mut(&mut module_data.lotteries_table, lottery_id);
         
         // Only the creator can execute
         assert!(account_addr == lottery.creator, error::permission_denied(E_NOT_AUTHORIZED));
@@ -253,7 +260,6 @@ module airdrop_lottery_addr::airdrop_lottery {
         lottery.is_completed = true;
         
         // Emit event
-        let module_data = borrow_global_mut<ModuleData>(@airdrop_lottery_addr);
         event::emit_event(
             &mut module_data.lottery_completion_events,
             LotteryCompletionEvent {
@@ -284,10 +290,11 @@ module airdrop_lottery_addr::airdrop_lottery {
 
     /// Get the details of the lottery
     #[view]
-    public fun get_lottery_details(lottery_id: u64): (String, String, u64, u64, bool, address, u64, u64) acquires AirdropLottery {
-        assert!(exists<AirdropLottery>(@airdrop_lottery_addr), error::not_found(E_LOTTERY_NOT_FOUND));
+    public fun get_lottery_details(lottery_id: u64): (String, String, u64, u64, bool, address, u64, u64) acquires ModuleData {
+        let module_data = borrow_global<ModuleData>(@airdrop_lottery_addr);
+        assert!(table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
         
-        let lottery = borrow_global<AirdropLottery>(@airdrop_lottery_addr);
+        let lottery = table::borrow(&module_data.lotteries_table, lottery_id);
         
         (
             *&lottery.name,
@@ -303,19 +310,21 @@ module airdrop_lottery_addr::airdrop_lottery {
 
     /// Get the participant list of the lottery
     #[view]
-    public fun get_participants(lottery_id: u64): vector<address> acquires AirdropLottery {
-        assert!(exists<AirdropLottery>(@airdrop_lottery_addr), error::not_found(E_LOTTERY_NOT_FOUND));
+    public fun get_participants(lottery_id: u64): vector<address> acquires ModuleData {
+        let module_data = borrow_global<ModuleData>(@airdrop_lottery_addr);
+        assert!(table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
         
-        let lottery = borrow_global<AirdropLottery>(@airdrop_lottery_addr);
+        let lottery = table::borrow(&module_data.lotteries_table, lottery_id);
         *&lottery.participants
     }
 
     /// Get the winner list of the lottery
     #[view]
-    public fun get_winners(lottery_id: u64): vector<address> acquires AirdropLottery {
-        assert!(exists<AirdropLottery>(@airdrop_lottery_addr), error::not_found(E_LOTTERY_NOT_FOUND));
+    public fun get_winners(lottery_id: u64): vector<address> acquires ModuleData {
+        let module_data = borrow_global<ModuleData>(@airdrop_lottery_addr);
+        assert!(table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
         
-        let lottery = borrow_global<AirdropLottery>(@airdrop_lottery_addr);
+        let lottery = table::borrow(&module_data.lotteries_table, lottery_id);
         assert!(lottery.is_completed, error::invalid_state(E_LOTTERY_NOT_COMPLETED));
         
         *&lottery.winners
@@ -361,7 +370,7 @@ module airdrop_lottery_addr::airdrop_lottery {
     }
 
     #[test(aptos_framework = @aptos_framework, admin = @airdrop_lottery_addr)]
-    public fun test_create_lottery(aptos_framework: &signer, admin: &signer) acquires AccountLotteries, ModuleData, AirdropLottery {
+    public fun test_create_lottery(aptos_framework: &signer, admin: &signer) acquires AccountLotteries, ModuleData {
         setup_test(aptos_framework, admin);
         let name = string::utf8(b"Test Lottery");
         let description = string::utf8(b"This is a test lottery");
@@ -381,7 +390,7 @@ module airdrop_lottery_addr::airdrop_lottery {
     }
 
     #[test(aptos_framework = @aptos_framework, admin = @airdrop_lottery_addr, user1 = @0x1234, user2 = @0x5678)]
-    public fun test_register_participant(aptos_framework: &signer, admin: &signer, user1: &signer, user2: &signer) acquires AccountLotteries, ModuleData, AirdropLottery {
+    public fun test_register_participant(aptos_framework: &signer, admin: &signer, user1: &signer, user2: &signer) acquires AccountLotteries, ModuleData {
         setup_test(aptos_framework, admin);
         account::create_account_for_test(signer::address_of(user1));
         account::create_account_for_test(signer::address_of(user2));
@@ -401,7 +410,7 @@ module airdrop_lottery_addr::airdrop_lottery {
 
     #[lint::allow_unsafe_randomness]
     #[test(aptos_framework = @aptos_framework, admin = @airdrop_lottery_addr, user1 = @0x1234, user2 = @0x5678, user3 = @0x9ABC)]
-    public fun test_draw_winners(aptos_framework: &signer, admin: &signer, user1: &signer, user2: &signer, user3: &signer) acquires AccountLotteries, ModuleData, AirdropLottery {
+    public fun test_draw_winners(aptos_framework: &signer, admin: &signer, user1: &signer, user2: &signer, user3: &signer) acquires AccountLotteries, ModuleData {
         randomness::initialize_for_testing(aptos_framework);
         setup_test(aptos_framework, admin);
         account::create_account_for_test(signer::address_of(user1));
@@ -435,7 +444,7 @@ module airdrop_lottery_addr::airdrop_lottery {
     #[lint::allow_unsafe_randomness]
     #[test(aptos_framework = @aptos_framework, admin = @airdrop_lottery_addr, user1 = @0x1234)]
     #[expected_failure(abort_code = 196613, location = airdrop_lottery_addr::airdrop_lottery)]
-    public fun test_draw_winners_before_deadline(aptos_framework: &signer, admin: &signer, user1: &signer) acquires AccountLotteries, ModuleData, AirdropLottery {
+    public fun test_draw_winners_before_deadline(aptos_framework: &signer, admin: &signer, user1: &signer) acquires AccountLotteries, ModuleData {
         randomness::initialize_for_testing(aptos_framework);
         setup_test(aptos_framework, admin);
         account::create_account_for_test(signer::address_of(user1));
@@ -452,7 +461,7 @@ module airdrop_lottery_addr::airdrop_lottery {
     #[lint::allow_unsafe_randomness]
     #[test(aptos_framework = @aptos_framework, admin = @airdrop_lottery_addr, user1 = @0x1234)]
     #[expected_failure(abort_code = 65545, location = airdrop_lottery_addr::airdrop_lottery)]
-    public fun test_insufficient_participants(aptos_framework: &signer, admin: &signer, user1: &signer) acquires AccountLotteries, ModuleData, AirdropLottery {
+    public fun test_insufficient_participants(aptos_framework: &signer, admin: &signer, user1: &signer) acquires AccountLotteries, ModuleData {
         randomness::initialize_for_testing(aptos_framework);
         setup_test(aptos_framework, admin);
         account::create_account_for_test(signer::address_of(user1));
@@ -470,7 +479,7 @@ module airdrop_lottery_addr::airdrop_lottery {
     #[lint::allow_unsafe_randomness]
     #[test(aptos_framework = @aptos_framework, admin = @airdrop_lottery_addr, user1 = @0x1234, user2 = @0x5678)]
     #[expected_failure(abort_code = 327681, location = airdrop_lottery_addr::airdrop_lottery)]
-    public fun test_unauthorized_draw(aptos_framework: &signer, admin: &signer, user1: &signer, user2: &signer) acquires AccountLotteries, ModuleData, AirdropLottery {
+    public fun test_unauthorized_draw(aptos_framework: &signer, admin: &signer, user1: &signer, user2: &signer) acquires AccountLotteries, ModuleData {
         randomness::initialize_for_testing(aptos_framework);
         setup_test(aptos_framework, admin);
         account::create_account_for_test(signer::address_of(user1));
@@ -487,7 +496,7 @@ module airdrop_lottery_addr::airdrop_lottery {
     }
 
     #[test(aptos_framework = @aptos_framework, admin = @airdrop_lottery_addr, user1 = @0x1234, user2 = @0x5678, user3 = @0x9ABC)]
-    public fun test_add_multiple_participants(aptos_framework: &signer, admin: &signer, user1: &signer, user2: &signer, user3: &signer) acquires AccountLotteries, ModuleData, AirdropLottery {
+    public fun test_add_multiple_participants(aptos_framework: &signer, admin: &signer, user1: &signer, user2: &signer, user3: &signer) acquires AccountLotteries, ModuleData {
         setup_test(aptos_framework, admin);
         account::create_account_for_test(signer::address_of(user1));
         account::create_account_for_test(signer::address_of(user2));
@@ -517,7 +526,7 @@ module airdrop_lottery_addr::airdrop_lottery {
     }
 
     #[test(aptos_framework = @aptos_framework, admin = @airdrop_lottery_addr, user1 = @0x1234, user2 = @0x5678, user3 = @0x9ABC)]
-    public fun test_remove_multiple_participants(aptos_framework: &signer, admin: &signer, user1: &signer, user2: &signer, user3: &signer) acquires AccountLotteries, ModuleData, AirdropLottery {
+    public fun test_remove_multiple_participants(aptos_framework: &signer, admin: &signer, user1: &signer, user2: &signer, user3: &signer) acquires AccountLotteries, ModuleData {
         setup_test(aptos_framework, admin);
         account::create_account_for_test(signer::address_of(user1));
         account::create_account_for_test(signer::address_of(user2));

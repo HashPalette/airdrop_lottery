@@ -4,7 +4,7 @@ module airdrop_lottery_addr::airdrop_lottery {
     use std::string::{Self, String};
     use std::vector;
     use aptos_framework::account;
-    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::event;
     use aptos_framework::randomness;
     use aptos_framework::timestamp;
     use aptos_std::table::{Self, Table};
@@ -52,10 +52,6 @@ module airdrop_lottery_addr::airdrop_lottery {
         lotteries: vector<u64>,
         /// Table to store all lotteries by ID
         lotteries_table: Table<u64, AirdropLottery>,
-        /// Lottery creation event
-        lottery_creation_events: EventHandle<LotteryCreationEvent>,
-        /// Lottery completion event
-        lottery_completion_events: EventHandle<LotteryCompletionEvent>,
     }
 
     /// Structure to manage the list of lotteries created by an account
@@ -64,7 +60,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         created_lotteries: vector<u64>,
     }
 
-    /// Lottery creation event
+    #[event]
     struct LotteryCreationEvent has drop, store {
         lottery_id: u64,
         name: String,
@@ -73,7 +69,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         deadline: u64,
     }
 
-    /// Lottery completion event
+    #[event]
     struct LotteryCompletionEvent has drop, store {
         lottery_id: u64,
         winners: vector<address>,
@@ -88,8 +84,6 @@ module airdrop_lottery_addr::airdrop_lottery {
             next_lottery_id: 1,
             lotteries: vector::empty<u64>(),
             lotteries_table: table::new(),
-            lottery_creation_events: account::new_event_handle<LotteryCreationEvent>(account),
-            lottery_completion_events: account::new_event_handle<LotteryCompletionEvent>(account),
         });
         
         // Initialize AccountLotteries
@@ -148,8 +142,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         vector::push_back(&mut account_lotteries.created_lotteries, lottery_id);
         
         // Emit event
-        event::emit_event(
-            &mut module_data.lottery_creation_events,
+        event::emit(
             LotteryCreationEvent {
                 lottery_id,
                 name: *&name,
@@ -228,7 +221,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         };
     }
 
-    /// Execute the lottery and select winners (creator only)
+
     #[randomness]
     entry fun draw_winners(
         account: &signer,
@@ -260,8 +253,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         lottery.is_completed = true;
         
         // Emit event
-        event::emit_event(
-            &mut module_data.lottery_completion_events,
+        event::emit(
             LotteryCompletionEvent {
                 lottery_id,
                 winners: *&lottery.winners,
@@ -288,7 +280,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         winners
     }
 
-    /// Get the details of the lottery
+
     #[view]
     public fun get_lottery_details(lottery_id: u64): (String, String, u64, u64, bool, address, u64, u64) acquires ModuleData {
         let module_data = borrow_global<ModuleData>(@airdrop_lottery_addr);
@@ -308,7 +300,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         )
     }
 
-    /// Get the participant list of the lottery
+
     #[view]
     public fun get_participants(lottery_id: u64): vector<address> acquires ModuleData {
         let module_data = borrow_global<ModuleData>(@airdrop_lottery_addr);
@@ -318,7 +310,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         *&lottery.participants
     }
 
-    /// Get the winner list of the lottery
+
     #[view]
     public fun get_winners(lottery_id: u64): vector<address> acquires ModuleData {
         let module_data = borrow_global<ModuleData>(@airdrop_lottery_addr);
@@ -332,7 +324,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         }
     }
 
-    /// Get the list of lotteries created by the account
+
     #[view]
     public fun get_account_lotteries(account_address: address): vector<u64> acquires AccountLotteries {
         if (!exists<AccountLotteries>(account_address)) {
@@ -343,7 +335,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         *&account_lotteries.created_lotteries
     }
 
-    /// Get the list of all lottery IDs
+
     #[view]
     public fun get_all_lotteries(): vector<u64> acquires ModuleData {
         let module_data = borrow_global<ModuleData>(@airdrop_lottery_addr);

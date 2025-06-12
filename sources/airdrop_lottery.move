@@ -4,10 +4,11 @@ module airdrop_lottery_addr::airdrop_lottery {
     use std::string::{Self, String};
     use std::vector;
     use aptos_framework::account;
-    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::event;
     use aptos_framework::randomness;
     use aptos_framework::timestamp;
-    use aptos_std::table::{Self, Table};
+    use aptos_std::smart_table::{Self, SmartTable};
+    use aptos_std::smart_vector::{Self, SmartVector};
 
     /// Error codes
     const E_NOT_AUTHORIZED: u64 = 1;
@@ -29,9 +30,9 @@ module airdrop_lottery_addr::airdrop_lottery {
         /// Description of the lottery
         description: String,
         /// List of participants
-        participants: vector<address>,
+        participants: SmartVector<address>,
         /// List of winners
-        winners: vector<address>,
+        winners: SmartVector<address>,
         /// Number of winners
         winner_count: u64,
         /// Whether the lottery is completed
@@ -51,11 +52,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         /// List of created lotteries
         lotteries: vector<u64>,
         /// Table to store all lotteries by ID
-        lotteries_table: Table<u64, AirdropLottery>,
-        /// Lottery creation event
-        lottery_creation_events: EventHandle<LotteryCreationEvent>,
-        /// Lottery completion event
-        lottery_completion_events: EventHandle<LotteryCompletionEvent>,
+        lotteries_table: SmartTable<u64, AirdropLottery>,
     }
 
     /// Structure to manage the list of lotteries created by an account
@@ -64,7 +61,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         created_lotteries: vector<u64>,
     }
 
-    /// Lottery creation event
+    #[event]
     struct LotteryCreationEvent has drop, store {
         lottery_id: u64,
         name: String,
@@ -73,7 +70,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         deadline: u64,
     }
 
-    /// Lottery completion event
+    #[event]
     struct LotteryCompletionEvent has drop, store {
         lottery_id: u64,
         winners: vector<address>,
@@ -87,9 +84,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         move_to(account, ModuleData {
             next_lottery_id: 1,
             lotteries: vector::empty<u64>(),
-            lotteries_table: table::new(),
-            lottery_creation_events: account::new_event_handle<LotteryCreationEvent>(account),
-            lottery_completion_events: account::new_event_handle<LotteryCompletionEvent>(account),
+            lotteries_table: smart_table::new(),
         });
         
         // Initialize AccountLotteries
@@ -122,8 +117,8 @@ module airdrop_lottery_addr::airdrop_lottery {
             lottery_id,
             name,
             description,
-            participants: vector::empty<address>(),
-            winners: vector::empty<address>(),
+            participants: smart_vector::new<address>(),
+            winners: smart_vector::new<address>(),
             winner_count,
             is_completed: false,
             creator: account_addr,
@@ -132,7 +127,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         };
         
         // Save the lottery to global storage
-        table::add(&mut module_data.lotteries_table, lottery_id, lottery);
+        smart_table::add(&mut module_data.lotteries_table, lottery_id, lottery);
         
         // Update module data
         vector::push_back(&mut module_data.lotteries, lottery_id);
@@ -148,8 +143,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         vector::push_back(&mut account_lotteries.created_lotteries, lottery_id);
         
         // Emit event
-        event::emit_event(
-            &mut module_data.lottery_creation_events,
+        event::emit(
             LotteryCreationEvent {
                 lottery_id,
                 name: *&name,
@@ -170,9 +164,9 @@ module airdrop_lottery_addr::airdrop_lottery {
         
         // Get module data and check if lottery exists
         let module_data = borrow_global_mut<ModuleData>(@airdrop_lottery_addr);
-        assert!(table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
+        assert!(smart_table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
         
-        let lottery = table::borrow_mut(&mut module_data.lotteries_table, lottery_id);
+        let lottery = smart_table::borrow_mut(&mut module_data.lotteries_table, lottery_id);
         
         // Only the creator can execute
         assert!(account_addr == lottery.creator, error::permission_denied(E_NOT_AUTHORIZED));
@@ -186,9 +180,9 @@ module airdrop_lottery_addr::airdrop_lottery {
         while (i < participants_count) {
             let participant = *vector::borrow(&participants, i);
             // Check if not already registered
-            let (is_registered, _) = vector::index_of(&lottery.participants, &participant);
+            let (is_registered, _) = smart_vector::index_of(&lottery.participants, &participant);
             if (!is_registered) {
-                vector::push_back(&mut lottery.participants, participant);
+                smart_vector::push_back(&mut lottery.participants, participant);
             };
             i = i + 1;
         };
@@ -204,9 +198,9 @@ module airdrop_lottery_addr::airdrop_lottery {
         
         // Get module data and check if lottery exists
         let module_data = borrow_global_mut<ModuleData>(@airdrop_lottery_addr);
-        assert!(table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
+        assert!(smart_table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
         
-        let lottery = table::borrow_mut(&mut module_data.lotteries_table, lottery_id);
+        let lottery = smart_table::borrow_mut(&mut module_data.lotteries_table, lottery_id);
         
         // Only the creator can execute
         assert!(account_addr == lottery.creator, error::permission_denied(E_NOT_AUTHORIZED));
@@ -220,15 +214,15 @@ module airdrop_lottery_addr::airdrop_lottery {
         while (i < participants_count) {
             let participant = *vector::borrow(&participants, i);
             // Check if the participant exists
-            let (is_registered, index) = vector::index_of(&lottery.participants, &participant);
+            let (is_registered, index) = smart_vector::index_of(&lottery.participants, &participant);
             if (is_registered) {
-                vector::remove(&mut lottery.participants, index);
+                smart_vector::remove(&mut lottery.participants, index);
             };
             i = i + 1;
         };
     }
 
-    /// Execute the lottery and select winners (creator only)
+
     #[randomness]
     entry fun draw_winners(
         account: &signer,
@@ -238,9 +232,9 @@ module airdrop_lottery_addr::airdrop_lottery {
         
         // Get module data and check if lottery exists
         let module_data = borrow_global_mut<ModuleData>(@airdrop_lottery_addr);
-        assert!(table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
+        assert!(smart_table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
         
-        let lottery = table::borrow_mut(&mut module_data.lotteries_table, lottery_id);
+        let lottery = smart_table::borrow_mut(&mut module_data.lotteries_table, lottery_id);
         
         // Only the creator can execute
         assert!(account_addr == lottery.creator, error::permission_denied(E_NOT_AUTHORIZED));
@@ -252,19 +246,28 @@ module airdrop_lottery_addr::airdrop_lottery {
         assert!(timestamp::now_seconds() >= lottery.deadline, error::invalid_state(E_DEADLINE_NOT_REACHED));
         
         // Check if the number of participants is at least the number of winners
-        let participant_count = vector::length(&lottery.participants);
+        let participant_count = smart_vector::length(&lottery.participants);
         assert!(participant_count >= lottery.winner_count, error::invalid_argument(E_INSUFFICIENT_PARTICIPANTS));
         
         // Select winners
-        lottery.winners = shuffle_and_select(&lottery.participants, lottery.winner_count);
+        let participants_vec = smart_vector::to_vector(&lottery.participants);
+        let winners_vec = shuffle_and_select(&participants_vec, lottery.winner_count);
+        
+        // Add winners to SmartVector one by one
+        let i = 0;
+        let winners_count = vector::length(&winners_vec);
+        while (i < winners_count) {
+            let winner = *vector::borrow(&winners_vec, i);
+            smart_vector::push_back(&mut lottery.winners, winner);
+            i = i + 1;
+        };
         lottery.is_completed = true;
         
         // Emit event
-        event::emit_event(
-            &mut module_data.lottery_completion_events,
+        event::emit(
             LotteryCompletionEvent {
                 lottery_id,
-                winners: *&lottery.winners,
+                winners: smart_vector::to_vector(&lottery.winners),
             },
         );
     }
@@ -288,19 +291,19 @@ module airdrop_lottery_addr::airdrop_lottery {
         winners
     }
 
-    /// Get the details of the lottery
+
     #[view]
     public fun get_lottery_details(lottery_id: u64): (String, String, u64, u64, bool, address, u64, u64) acquires ModuleData {
         let module_data = borrow_global<ModuleData>(@airdrop_lottery_addr);
-        assert!(table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
+        assert!(smart_table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
         
-        let lottery = table::borrow(&module_data.lotteries_table, lottery_id);
+        let lottery = smart_table::borrow(&module_data.lotteries_table, lottery_id);
         
         (
             *&lottery.name,
             *&lottery.description,
             lottery.winner_count,
-            vector::length(&lottery.participants),
+            smart_vector::length(&lottery.participants),
             lottery.is_completed,
             lottery.creator,
             lottery.created_at,
@@ -308,31 +311,31 @@ module airdrop_lottery_addr::airdrop_lottery {
         )
     }
 
-    /// Get the participant list of the lottery
+
     #[view]
     public fun get_participants(lottery_id: u64): vector<address> acquires ModuleData {
         let module_data = borrow_global<ModuleData>(@airdrop_lottery_addr);
-        assert!(table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
+        assert!(smart_table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
         
-        let lottery = table::borrow(&module_data.lotteries_table, lottery_id);
-        *&lottery.participants
+        let lottery = smart_table::borrow(&module_data.lotteries_table, lottery_id);
+        smart_vector::to_vector(&lottery.participants)
     }
 
-    /// Get the winner list of the lottery
+
     #[view]
     public fun get_winners(lottery_id: u64): vector<address> acquires ModuleData {
         let module_data = borrow_global<ModuleData>(@airdrop_lottery_addr);
-        assert!(table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
+        assert!(smart_table::contains(&module_data.lotteries_table, lottery_id), error::not_found(E_LOTTERY_NOT_FOUND));
         
-        let lottery = table::borrow(&module_data.lotteries_table, lottery_id);
+        let lottery = smart_table::borrow(&module_data.lotteries_table, lottery_id);
         if (lottery.is_completed) {
-            *&lottery.winners
+            smart_vector::to_vector(&lottery.winners)
         } else {
             vector::empty<address>()
         }
     }
 
-    /// Get the list of lotteries created by the account
+
     #[view]
     public fun get_account_lotteries(account_address: address): vector<u64> acquires AccountLotteries {
         if (!exists<AccountLotteries>(account_address)) {
@@ -343,7 +346,7 @@ module airdrop_lottery_addr::airdrop_lottery {
         *&account_lotteries.created_lotteries
     }
 
-    /// Get the list of all lottery IDs
+
     #[view]
     public fun get_all_lotteries(): vector<u64> acquires ModuleData {
         let module_data = borrow_global<ModuleData>(@airdrop_lottery_addr);

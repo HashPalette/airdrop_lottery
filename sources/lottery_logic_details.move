@@ -2,7 +2,6 @@ module airdrop_lottery_addr::lottery_logic_details {
     use std::vector;
     use std::error;
     use aptos_framework::randomness;
-    use std::table;
     /// Detailed implementation of the lottery logic
 
     // Detailed implementation of the function that shuffles the participant list and selects the specified number of winners
